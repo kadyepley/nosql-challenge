@@ -154,3 +154,171 @@ establishments.update_many({}, [{'$set' : {'RatingValue' : {'$toDouble' : '$Rati
                             )
 ### Check that the coordinates and rating value are now numbers
 establishments.find_one()
+
+# Eat Safe, Love
+
+## Notebook Set Up
+
+### Import dependencies
+
+from pymongo import MongoClient
+from pprint import print
+
+### Create an instance of MongoClient
+
+mongo = MongoClient(port=27017)
+
+### Assign the uk_food database to a variable name
+
+db = mongo['uk_food']
+
+### Review the collections in our database
+
+print(db.list_collection_names())
+
+### Assign the collection to a variable
+
+establishments = db['establishments']
+
+# Part 3: Exploratory Analysis
+
+Unless otherwise stated, for each question: 
+* Use `count_documents` to display the number of documents contained in the result.
+* Display the first document in the results using `pprint`.
+* Convert the result to a Pandas DataFrame, print the number of rows in the DataFrame, and display the first 10 rows.
+  
+## 1. Which establishments have a hygiene score equal to 20?
+
+### Find the establishments with a hygiene score of 20
+
+query = {'scores.Hygiene' : 20}
+
+### Use count_documents to display the number of documents in the result
+
+count = establishments.count_documents(query)
+print(f'Number of Documents: {count}')
+
+### Display the first document in the results using print
+
+pprint(establishments.find_one(query))
+
+### Convert the result to a Pandas DataFrame
+
+### Import the dependency
+
+import pandas as pd
+
+### Create the dataframe
+
+hygiene_df = pd.DataFrame(establishments.find(query))
+
+### Display the number of rows in the DataFrame
+
+print(f'Number of Rows: {len(hygiene_df)}')
+
+### Display the first 10 rows of the DataFrame
+
+hygiene_df.head(10)
+
+## 2. Which establishments in London have a `RatingValue` greater than or equal to 4?
+
+### Find the establishments with London as the Local Authority and has a RatingValue greater than or equal to 4.
+
+query2 = {'LocalAuthorityName' : {'$regex' : 'London'},
+         'RatingValue' : {'$gte' : '4'}
+         }
+
+### Use count_documents to display the number of documents in the result
+
+count2 = establishments.count_documents(query2)
+print(f'Number of Documents: {count2}')
+
+### Display the first document in the results using print
+
+pprint(establishments.find_one(query2))
+
+### Convert the result to a Pandas DataFrame
+
+rating_val_df = pd.DataFrame(establishments.find(query2))
+
+### Display the number of rows in the DataFrame
+
+print(f'Number of Rows: {len(rating_val_df)}')
+
+### Display the first 10 rows of the DataFrame
+
+rating_val_df.head(10)
+
+## 3. What are the top 5 establishments with a `RatingValue` rating value of 5, sorted by lowest hygiene score, nearest to the new restaurant added, "Penang Flavours"?
+
+### Search within 0.01 degree on either side of the latitude and longitude.
+### Rating value must equal 5
+### Sort by hygiene score
+
+### Print the longitude and latitude of Penang 
+
+### pprint(establishments.find_one({'BusinessName' : 'Penang Flavours'}, {'geocode.latitude', 'geocode.longitude'}))
+
+degree_search = 0.01
+latitude = 51.49014200
+longitude = 0.08384000
+
+query3 = {'RatingValue': '5',
+    'geocode.latitude' : {'$lte': latitude + degree_search, '$gte': latitude - degree_search},
+    'geocode.longitude' : {'$lte': longitude + degree_search, '$gte': longitude - degree_search}
+}
+
+### Sort by hygiene score
+
+sort =  [('scores.Hygiene', 1)]
+
+### Print the results
+
+results = establishments.find(query3).sort(sort)
+pprint(list(results))
+
+### Convert result to Pandas DataFrame
+
+pd.DataFrame(establishments.find(query3).sort(sort).limit(5))
+
+## 4. How many establishments in each Local Authority area have a hygiene score of 0?
+
+### Create a pipeline that: 
+
+### 1. Matches establishments with a hygiene score of 0
+
+match_query = {'$match' : {'scores.Hygiene' : 0}}
+
+### 2. Groups the matches by Local Authority
+
+group_query = {'$group' : {'_id' : '$LocalAuthorityName',
+                           'count' : {'$sum' : 1}
+                            }
+                }
+
+### 3. Sorts the matches from highest to lowest
+
+sort_values = {'$sort' : {'count' : -1}}
+
+pipeline = [match_query, match_query, sort_values]
+
+results2 = list(establishments.aggregate(pipeline))
+
+### Print the number of documents in the result
+print(f'Number of Documents: {len(results2)}')
+
+### Print the first 10 results
+
+pprint(results2[0:10])
+
+### Convert the result to a Pandas DataFrame
+
+aggregated_df = pd.json_normalize(results2)
+
+### Display the number of rows in the DataFrame
+
+print(f'Number of Rows: {len(aggregated_df)}')
+
+### Display the first 10 rows of the DataFrame
+
+aggregated_df.head(10)
